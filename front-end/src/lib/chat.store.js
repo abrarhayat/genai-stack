@@ -45,8 +45,15 @@ function createChatStore() {
         update((state) => ({ ...state, state: chatStates.RECEIVING }));
         addMessage("me", question, ragMode);
         const messageId = addMessage("bot", "", ragMode);
+        let messagesFromBot = '';
+        let messagesFromMe = '';
+        const unsubscribe = chatStore.subscribe((state) => {
+            messagesFromBot = state.data.filter((message) => message.from === "bot").reduce((botMessages, message) => botMessages + '\n' + message.text, "");
+            messagesFromMe = state.data.filter((message) => message.from === "me").reduce((myMessages, message) => myMessages + '\n' + message.text, "");
+        });
+        unsubscribe()
         try {
-            const evt = new EventSource(`${API_ENDPOINT}?text=${encodeURI(question)}&rag=${ragMode}`);
+            const evt = new EventSource(`${API_ENDPOINT}?text=${encodeURI(`Based on my previous messages: ${messagesFromMe} and responses from you: ${messagesFromBot}, answer this question: ${question}`)}&rag=${ragMode}`);
             question = "";
             evt.onmessage = (e) => {
                 if (e.data) {
