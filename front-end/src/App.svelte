@@ -1,121 +1,174 @@
 <script>
-    import { tick } from "svelte";
-    import SvelteMarkdown from "svelte-markdown";
-    import botImage from "./assets/images/bot.jpeg";
-    import meImage from "./assets/images/me.jpeg";
-    import MdLink from "./lib/MdLink.svelte";
-    import External from "./lib/External.svelte";
-    import { chatStates, chatStore } from "./lib/chat.store.js";
-    import Modal from "./lib/Modal.svelte";
-    import { generationStore } from "./lib/generation.store";
+  import { tick } from "svelte";
+  import SvelteMarkdown from "svelte-markdown";
+  import botImage from "./assets/images/bot.jpeg";
+  import meImage from "./assets/images/me.jpeg";
+  import MdLink from "./lib/MdLink.svelte";
+  import External from "./lib/External.svelte";
+  import { chatStates, chatStore } from "./lib/chat.store.js";
+  import Modal from "./lib/Modal.svelte";
+  import { generationStore } from "./lib/generation.store";
 
-    let ragMode = false;
-    let question = "";
-    let shouldAutoScroll = true;
-    let input;
-    let senderImages = { bot: botImage, me: meImage };
-    let generationModalOpen = false;
+  let ragMode = false;
+  let question = "";
+  let prevQuestion = ""
+  let shouldAutoScroll = true;
+  let input;
+  let senderImages = { bot: botImage, me: meImage };
+  let generationModalOpen = false;
 
-    function send() {
-        chatStore.send(question, ragMode);
-        question = "";
-    }
+  function send() {
+    chatStore.send(question, ragMode, false);
+    prevQuestion = question
+    question = "";
+  }
 
-    function scrollToBottom(node, _) {
-        const scroll = () => node.scrollTo({ top: node.scrollHeight });
-        scroll();
-        return { update: () => shouldAutoScroll && scroll() };
-    }
+  function sendWithoutContext() {
+    chatStore.send(question, ragMode, true);
+    prevQuestion = question
+    question = "";
+  }
 
-    function scrolling(e) {
-        shouldAutoScroll = e.target.scrollTop + e.target.clientHeight > e.target.scrollHeight - 55;
-    }
+  function clearContext(question, inputRef) {
+    console.log("question", question);
+    inputRef.value = prevQuestion;
+    chatStore.clearContext();
+  }
+  function scrollToBottom(node, _) {
+    const scroll = () => node.scrollTo({ top: node.scrollHeight });
+    scroll();
+    return { update: () => shouldAutoScroll && scroll() };
+  }
 
-    function generateTicket(text) {
-        generationStore.generate(text);
-        generationModalOpen = true;
-    }
+  function scrolling(e) {
+    shouldAutoScroll =
+      e.target.scrollTop + e.target.clientHeight > e.target.scrollHeight - 55;
+  }
 
-    $: $chatStore.state === chatStates.IDLE && input && focus(input);
-    async function focus(node) {
-        await tick();
-        node.focus();
-    }
-    // send();
+  function generateTicket(text) {
+    generationStore.generate(text);
+    generationModalOpen = true;
+  }
+
+  $: $chatStore.state === chatStates.IDLE && input && focus(input);
+  async function focus(node) {
+    await tick();
+    node.focus();
+  }
+  // send();
 </script>
 
-<main class="h-full text-sm bg-gradient-to-t from-indigo-100 bg-fixed overflow-hidden">
-    <div on:scroll={scrolling} class="flex h-full flex-col py-12 overflow-y-auto" use:scrollToBottom={$chatStore}>
-        <div class="w-4/5 mx-auto flex flex-col mb-32">
-            {#each $chatStore.data as message (message.id)}
-                <div
-                    class="max-w-[80%] min-w-[40%] rounded-lg p-4 mb-4 overflow-x-auto bg-white border border-indigo-200"
-                    class:self-end={message.from === "me"}
-                    class:text-right={message.from === "me"}
-                >
-                    <div class="flex flex-row gap-2">
-                        {#if message.from === "me"}
-                            <button
-                                aria-label="Generate a new internal ticket from this question"
-                                title="Generate a new internal ticket from this question"
-                                on:click={() => generateTicket(message.text)}
-                                class="w-6 h-6 flex flex-col justify-center items-center border rounded border-indigo-200"
-                                ><External --color="#ccc" --hover-color="#999" /></button
-                            >
-                        {/if}
-                        <div
-                            class:ml-auto={message.from === "me"}
-                            class="relative w-12 h-12 border border-indigo-200 rounded flex justify-center items-center overflow-hidden"
-                        >
-                            <img src={senderImages[message.from]} alt="" class="rounded-sm" />
-                        </div>
-                        {#if message.from === "bot"}
-                            <div class="text-sm">
-                                <div>Model: {message.model ? message.model : ""}</div>
-                                <div>RAG: {message.rag ? "Enabled" : "Disabled"}</div>
-                            </div>
-                        {/if}
-                    </div>
-                    <div class="mt-4"><SvelteMarkdown source={message.text} renderers={{ link: MdLink }} /></div>
-                </div>
-            {/each}
-        </div>
-        <div class="text-sm w-full fixed bottom-16">
-            <div class="shadow-lg bg-indigo-50 rounded-lg w-4/5 xl:w-2/3 2xl:w-1/2 mx-auto">
-                <div class="rounded-t-lg px-4 py-2 font-light">
-                    <div class="font-semibold">RAG mode</div>
-                    <div class="">
-                        <label class="mr-2">
-                            <input type="radio" bind:group={ragMode} value={false} /> Disabled
-                        </label>
-                        <label>
-                            <input type="radio" bind:group={ragMode} value={true} /> Enabled
-                        </label>
-                    </div>
-                </div>
-                <form class="rounded-md w-full bg-white p-2 m-0" on:submit|preventDefault={send}>
-                    <input
-                        placeholder="What coding related question can I help you with?"
-                        disabled={$chatStore.state === chatStates.RECEIVING}
-                        class="text-lg w-full bg-white focus:outline-none px-4"
-                        bind:value={question}
-                        bind:this={input}
-                        type="text"
-                    />
-                </form>
+<main
+  class="h-full text-sm bg-gradient-to-t from-indigo-100 bg-fixed overflow-hidden"
+>
+  <div
+    on:scroll={scrolling}
+    class="flex h-full flex-col py-12 overflow-y-auto"
+    use:scrollToBottom={$chatStore}
+  >
+    <div style="padding-bottom: 15rem;" class="w-4/5 mx-auto flex flex-col mb-32">
+      {#each $chatStore.data as message (message.id)}
+        <div
+          class="max-w-[80%] min-w-[40%] rounded-lg p-4 mb-4 overflow-x-auto bg-white border border-indigo-200"
+          class:self-end={message.from === "me"}
+          class:text-right={message.from === "me"}
+        >
+          <div class="flex flex-row gap-2">
+            {#if message.from === "me"}
+              <button
+                aria-label="Generate a new internal ticket from this question"
+                title="Generate a new internal ticket from this question"
+                on:click={() => generateTicket(message.text)}
+                class="w-6 h-6 flex flex-col justify-center items-center border rounded border-indigo-200"
+                ><External --color="#ccc" --hover-color="#999" /></button
+              >
+            {/if}
+            <div
+              class:ml-auto={message.from === "me"}
+              class="relative w-12 h-12 border border-indigo-200 rounded flex justify-center items-center overflow-hidden"
+            >
+              <img src={senderImages[message.from]} alt="" class="rounded-sm" />
             </div>
+            {#if message.from === "bot"}
+              <div class="text-sm">
+                <div>Model: {message.model ? message.model : ""}</div>
+                <div>RAG: {message.rag ? "Enabled" : "Disabled"}</div>
+              </div>
+            {/if}
+          </div>
+          <div class="mt-4">
+            <SvelteMarkdown
+              source={message.text}
+              renderers={{ link: MdLink }}
+            />
+          </div>
         </div>
+      {/each}
     </div>
+    <div class="text-sm w-full fixed bottom-16">
+      <div
+        class="shadow-lg bg-indigo-50 rounded-lg w-4/5 xl:w-2/3 2xl:w-1/2 mx-auto"
+      >
+        <div class="rounded-t-lg px-4 py-2 font-light">
+          <div class="font-semibold">
+            RAG mode (Might not generate accurate responses)
+          </div>
+          <div class="">
+            <label class="mr-2">
+              <input type="radio" bind:group={ragMode} value={false} /> Disabled
+            </label>
+            <label>
+              <input type="radio" bind:group={ragMode} value={true} /> Enabled
+            </label>
+          </div>
+        </div>
+        <form
+          class="rounded-md w-full bg-white p-2 m-0"
+          on:submit|preventDefault={send}
+        >
+          <!-- <input
+            placeholder="What coding related question can I help you with?"
+            disabled={$chatStore.state === chatStates.RECEIVING}
+            class="text-lg w-full bg-white focus:outline-none px-4"
+            bind:value={question}
+            bind:this={input}
+            type="text"
+          /> -->
+          <textarea class="text-lg w-full bg-white focus:outline-none px-4" 
+          id="prompt" name="prompt"
+          disabled={$chatStore.state === chatStates.RECEIVING}
+          placeholder={`What coding related question can I help you with?\nPlease provide me as much information as possible to generate more accurate responses.`}
+          bind:value={question}
+          bind:this={input}
+          rows="4" cols="50"/>
+          <button class="bg-blue-500 text-white rounded-lg px-4 py-2" type="submit">Submit</button>
+        </form>
+        {#if $chatStore.data.length > 0}
+            <div style="margin: 1rem;">
+            <span>Not getting the expected response?</span>
+            <div style="margin-top: 1rem; padding-bottom: 1rem;">
+                <button class="bg-blue-500 text-white rounded-lg px-4 py-2" on:click={() => sendWithoutContext()}>Submit without context</button>
+                <button class="bg-red-500 text-white rounded-lg px-4 py-2" on:click={() => clearContext(input.value, input)}>Clear all context</button>
+            </div>
+            </div>
+        {/if}
+      </div>
+    </div>
+  </div>
 </main>
 {#if generationModalOpen}
-    <Modal title="my title" text="my text" on:close={() => (generationModalOpen = false)} />
+  <Modal
+    title="my title"
+    text="my text"
+    on:close={() => (generationModalOpen = false)}
+  />
 {/if}
 
 <style>
-    :global(pre) {
-        @apply bg-gray-100 rounded-lg p-4 border border-indigo-200;
-    }
-    :global(code) {
-        @apply text-indigo-500;
-    }
+  :global(pre) {
+    @apply bg-gray-100 rounded-lg p-4 border border-indigo-200;
+  }
+  :global(code) {
+    @apply text-indigo-500;
+  }
 </style>

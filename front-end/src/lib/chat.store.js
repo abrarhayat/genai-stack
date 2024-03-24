@@ -38,7 +38,11 @@ function createChatStore() {
         });
     }
 
-    async function send(question, ragMode = false) {
+    function clearContext() {
+        update(() => ({ state: chatStates.IDLE, data: [] }));
+    }
+
+    async function send(question, ragMode = false, runWithoutContext = false) {
         if (!question.trim().length) {
             return;
         }
@@ -53,7 +57,17 @@ function createChatStore() {
         });
         unsubscribe()
         try {
-            const evt = new EventSource(`${API_ENDPOINT}?text=${encodeURI(`Based on my previous messages: ${messagesFromMe} and responses from you: ${messagesFromBot}, answer this question: ${question}`)}&rag=${ragMode}`);
+            let messageToSend = runWithoutContext
+                ? question
+                :
+                `Using this as context only:\n 
+                My previous messages:\n 
+                ${messagesFromMe}\n
+                Your previous responses:\n 
+                ${messagesFromBot}\n
+                Primarily answer this question:\n 
+                ${question}`;
+            const evt = new EventSource(`${API_ENDPOINT}?text=${encodeURI(messageToSend)}&rag=${ragMode}`);
             question = "";
             evt.onmessage = (e) => {
                 if (e.data) {
@@ -80,6 +94,7 @@ function createChatStore() {
     return {
         subscribe,
         send,
+        clearContext
     };
 }
 
